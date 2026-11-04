@@ -1,0 +1,19 @@
+{
+    "id": "443343C0-7AF4-4651-81A5-C6DA6FBB8B0D",
+    "version": "1.2.0",
+    "platform": "all",
+    "arch": "all",
+    "name": "Find by Media",
+    "logo": "/logo.png",
+    "keywords": ["similar", "search", "visual", "duplicate", "phash", "similarity", "image"],
+    "devTools": true,
+    "preview": {
+        "jpg,jpeg,png,gif,bmp,webp,svg,tiff,tif,ico": {
+            "inspector": {
+                "path": "index.html",
+                "height": 400,
+                "multiSelect": false
+            }
+        }
+    }
+}

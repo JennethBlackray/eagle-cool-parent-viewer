@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Parent Viewer</title>
+    <style>
+        /* ===== RESET & BASE ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 11px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== SCROLL CONTAINER ===== */
+        #app {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        /* Скрываем #app когда он пустой (показывается только контент) */
+        #app:empty {
+            padding: 0;
+        }
+
+        /* ===== RESIZE HANDLE ===== */
+        .resize-handle {
+            flex-shrink: 0;
+            height: 5px;
+            cursor: ns-resize;
+            position: relative;
+            background: transparent;
+            z-index: 10;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        .resize-handle::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 3px;
+            border-radius: 2px;
+            background: var(--card-border);
+            opacity: 0.5;
+            transition: opacity 0.15s ease, width 0.15s ease, background 0.15s ease;
+        }
+
+        .resize-handle:hover::before,
+        .resize-handle:active::before {
+            opacity: 0.8;
+            width: 40px;
+            background: var(--text-secondary);
+        }
+
+        .resize-handle:active {
+            background: transparent;
+        }
+
+        /* Визуальная линия на всю ширину при перетаскивании */
+        .resize-handle.dragging::before {
+            width: 100%;
+            height: 2px;
+            opacity: 0.3;
+            border-radius: 0;
+            background: var(--text-secondary);
+        }
+
+        /* Подсветка в темах */
+        body[theme="DARK"] .resize-handle::before,
+        body[theme="GRAY"] .resize-handle::before {
+            opacity: 0.4;
+        }
+
+        body[theme="DARK"] .resize-handle:hover::before,
+        body[theme="GRAY"] .resize-handle:hover::before {
+            opacity: 0.7;
+        }
+
+        /* ===== THEME SUPPORT ===== */
+        :root {
+            --bg: #ffffff;
+            --text: #333333;
+            --text-secondary: #888888;
+            --card-bg: #f5f5f5;
+            --card-border: #e0e0e0;
+            --card-hover-bg: #eeeeee;
+            --card-shadow: rgba(0, 0, 0, 0.08);
+            --badge-bg: #e8f0fe;
+            --badge-text: #1a73e8;
+            --scrollbar-thumb: #c0c0c0;
+            --scrollbar-track: transparent;
+        }
+
+        body[theme="LIGHT"] {
+            --bg: #ffffff;
+            --text: #333333;
+            --text-secondary: #888888;
+            --card-bg: #f5f5f5;
+            --card-border: #e0e0e0;
+            --card-hover-bg: #eeeeee;
+            --card-shadow: rgba(0, 0, 0, 0.08);
+            --badge-bg: #e8f0fe;
+            --badge-text: #1a73e8;
+            --scrollbar-thumb: #c0c0c0;
+        }
+
+        body[theme="LIGHTGRAY"] {
+            --bg: #f5f5f5;
+            --text: #333333;
+            --text-secondary: #888888;
+            --card-bg: #ebebeb;
+            --card-border: #d5d5d5;
+            --card-hover-bg: #e0e0e0;
+            --card-shadow: rgba(0, 0, 0, 0.08);
+            --badge-bg: #e0e0e0;
+            --badge-text: #555555;
+            --scrollbar-thumb: #b0b0b0;
+        }
+
+        body[theme="GRAY"] {
+            --bg: #2d2d2d;
+            --text: #e0e0e0;
+            --text-secondary: #999999;
+            --card-bg: #3a3a3a;
+            --card-border: #4a4a4a;
+            --card-hover-bg: #444444;
+            --card-shadow: rgba(0, 0, 0, 0.3);
+            --badge-bg: #4a4a4a;
+            --badge-text: #cccccc;
+            --scrollbar-thumb: #5a5a5a;
+        }
+
+        body[theme="BLUE"] {
+            --bg: #e8f0fe;
+            --text: #1a237e;
+            --text-secondary: #5c6bc0;
+            --card-bg: #ffffff;
+            --card-border: #c5cae9;
+            --card-hover-bg: #e8eaf6;
+            --card-shadow: rgba(26, 35, 126, 0.1);
+            --badge-bg: #c5cae9;
+            --badge-text: #283593;
+            --scrollbar-thumb: #9fa8da;
+        }
+
+        body[theme="PURPLE"] {
+            --bg: #f3e5f5;
+            --text: #4a148c;
+            --text-secondary: #7b1fa2;
+            --card-bg: #ffffff;
+            --card-border: #e1bee7;
+            --card-hover-bg: #f3e5f5;
+            --card-shadow: rgba(74, 20, 140, 0.1);
+            --badge-bg: #e1bee7;
+            --badge-text: #6a1b9a;
+            --scrollbar-thumb: #ce93d8;
+        }
+
+        body[theme="DARK"] {
+            --bg: #1e1e1e;
+            --text: #d4d4d4;
+            --text-secondary: #888888;
+            --card-bg: #2d2d2d;
+            --card-border: #3c3c3c;
+            --card-hover-bg: #383838;
+            --card-shadow: rgba(0, 0, 0, 0.4);
+            --badge-bg: #3c3c3c;
+            --badge-text: #aaaaaa;
+            --scrollbar-thumb: #555555;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 3px;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .header-title {
+            font-size: 11px;
+            font-weight: 600;
+            opacity: 0.85;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .header-title .parent-badge {
+            margin-top: 0;
+        }
+
+        .header-title .icon {
+            font-size: 12px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .header-count {
+            font-size: 10px;
+            opacity: 0.6;
+            background: var(--badge-bg);
+            color: var(--badge-text);
+            padding: 1px 6px;
+            border-radius: 8px;
+        }
+
+        .btn-watch-parent {
+            font-size: 9px;
+            font-weight: 600;
+            background: #1a73e8;
+            color: #fff;
+            border: 1px solid #1a73e8;
+            border-radius: 4px;
+            padding: 2px 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .btn-watch-parent:hover {
+            background: #1558b0;
+            border-color: #1558b0;
+        }
+
+        .btn-delete-set {
+            font-size: 9px;
+            font-weight: 600;
+            background: rgba(217, 72, 72, 0.16);
+            color: #ff7b7b;
+            border: 1px solid rgba(217, 72, 72, 0.4);
+            border-radius: 4px;
+            padding: 2px 6px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .btn-delete-set:hover {
+            background: #d94848;
+            color: #fff;
+        }
+
+        /* ===== GRID ===== */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            gap: 6px;
+        }
+
+        /* ===== CARD ===== */
+        .card {
+            display: flex;
+            flex-direction: column;
+            border-radius: 4px;
+            overflow: hidden;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+            position: relative;
+        }
+
+        .card:hover {
+            background: var(--card-hover-bg);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px var(--card-shadow);
+        }
+
+        .card:active {
+            transform: translateY(0);
+        }
+
+        .card-thumb {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            display: block;
+            background: var(--card-border);
+        }
+
+        .card-thumb[src=""],
+        .card-thumb:not([src]) {
+            display: none;
+        }
+
+        .card-thumb-placeholder {
+            width: 100%;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-border);
+            color: var(--text-secondary);
+            font-size: 20px;
+            opacity: 0.5;
+        }
+
+        .card-info {
+            padding: 3px 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 10px;
+            opacity: 0.75;
+            line-height: 1.4;
+        }
+
+        .card-info .ext {
+            opacity: 0.5;
+            margin-left: 2px;
+        }
+
+        /* ===== MESSAGES ===== */
+        .message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+            text-align: center;
+            gap: 6px;
+        }
+
+        .message-icon {
+            font-size: 24px;
+            opacity: 0.3;
+            margin-bottom: 4px;
+        }
+
+        .message-text {
+            font-size: 11px;
+            opacity: 0.6;
+            line-height: 1.5;
+        }
+
+        .message-text strong {
+            opacity: 1;
+            font-weight: 600;
+        }
+
+        .message-hint {
+            font-size: 10px;
+            opacity: 0.4;
+            margin-top: 2px;
+        }
+
+        /* ===== LOADING ===== */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--card-border);
+            border-top-color: var(--text-secondary);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            font-size: 11px;
+            opacity: 0.5;
+        }
+
+        /* ===== PARENT TAG BADGE ===== */
+        .parent-badge {
+            display: inline-block;
+            font-size: 9px;
+            background: var(--badge-bg);
+            color: var(--badge-text);
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-top: 4px;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .parent-badge:hover {
+            opacity: 0.85;
+            background: var(--badge-text);
+            color: var(--badge-bg);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 200px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+                gap: 4px;
+            }
+        }
+
+        @media (min-width: 500px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: 8px;
+            }
+        }
+
+        /* ===== ERROR ===== */
+        .error-message {
+            color: #e53935;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="loading">
+            <div class="spinner"></div>
+            <span class="loading-text">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Resize handle для ручной регулировки высоты -->
+    <div id="resize-handle" class="resize-handle"></div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ===== DOM REFERENCES =====
+            const app = document.getElementById('app');
+            const resizeHandle = document.getElementById('resize-handle');
+
+            // ===== RESIZE HANDLE + PERSISTENCE =====
+            const STORAGE_KEY = 'parent-viewer-height';
+            const MIN_HEIGHT = 100;
+            const MAX_HEIGHT = 800;
+            const DEFAULT_HEIGHT = 300;
+
+            // Загрузить сохранённую высоту из localStorage
+            function loadSavedHeight() {
+                try {
+                    const saved = localStorage.getItem(STORAGE_KEY);
+                    if (saved !== null) {
+                        const h = parseInt(saved, 10);
+                        if (!isNaN(h) && h >= MIN_HEIGHT && h <= MAX_HEIGHT) {
+                            return h;
+                        }
+                    }
+                } catch (e) {
+                    // localStorage недоступен — игнорируем
+                }
+                return null;
+            }
+
+            // Сохранить высоту в localStorage
+            function saveHeight(height) {
+                try {
+                    localStorage.setItem(STORAGE_KEY, String(height));
+                } catch (e) {
+                    // localStorage недоступен — игнорируем
+                }
+            }
+
+            // Применить высоту к html-элементу
+            function applyHeight(height) {
+                if (height !== null) {
+                    document.documentElement.style.height = height + 'px';
+                }
+            }
+
+            // Применить сохранённую высоту при загрузке
+            (function initHeight() {
+                const saved = loadSavedHeight();
+                if (saved !== null) {
+                    applyHeight(saved);
+                }
+            })();
+
+            // ===== RESIZE DRAG LOGIC (Pointer Events + setPointerCapture) =====
+            // Используем Pointer Events API с захватом указателя,
+            // чтобы перетаскивание не прерывалось при выходе курсора за границу окна.
+            let isDragging = false;
+            let startY = 0;
+            let startHeight = 0;
+
+            resizeHandle.addEventListener('pointerdown', function(e) {
+                isDragging = true;
+                startY = e.clientY;
+                startHeight = document.documentElement.offsetHeight;
+                resizeHandle.classList.add('dragging');
+                document.body.style.cursor = 'ns-resize';
+                document.body.style.userSelect = 'none';
+                // Захватываем указатель — pointermove/pointerup продолжают приходить
+                // даже за пределами окна плагина в Eagle WebView
+                resizeHandle.setPointerCapture(e.pointerId);
+                e.preventDefault();
+            });
+
+            resizeHandle.addEventListener('pointermove', function(e) {
+                if (!isDragging) return;
+                const delta = e.clientY - startY;
+                let newHeight = startHeight + delta;
+                newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+                applyHeight(newHeight);
+                e.preventDefault();
+            });
+
+            resizeHandle.addEventListener('pointerup', function(e) {
+                if (!isDragging) return;
+                isDragging = false;
+                resizeHandle.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                // Сохраняем финальную высоту
+                const finalHeight = document.documentElement.offsetHeight;
+                saveHeight(finalHeight);
+                e.preventDefault();
+            });
+
+            // ===== REGEX для parent:тега =====
+            // Ищет тег вида "parent:ABC123" (буквы и цифры, регистронезависимо)
+            const PARENT_TAG_REGEX = /^parent:([a-zA-Z0-9]+)$/;
+
+            // ===== HELPER: извлечь parent:тег из массива тегов =====
+            function extractParentTag(tags) {
+                if (!tags || !Array.isArray(tags) || tags.length === 0) {
+                    return null;
+                }
+                for (const tag of tags) {
+                    const match = tag.match(PARENT_TAG_REGEX);
+                    if (match) {
+                        return {
+                            full: match[0], // "parent:ABC123"
+                            value: match[1] // "ABC123"
+                        };
+                    }
+                }
+                return null;
+            }
+
+            // ===== HELPER: экранирование HTML =====
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // ===== HELPER: конвертация пути миниатюры в file:/// URL =====
+            // Аналог filePathToURL из find-by-media
+            function filePathToURL(filePath) {
+                if (!filePath) return null;
+                // Нормализуем обратные слеши в прямые
+                const normalized = filePath.replace(/\\/g, '/');
+                // Кодируем URI и экранируем #
+                const encoded = encodeURI(normalized).replace(/#/g, '%23');
+                // Добавляем cache-busting
+                return 'file:///' + encoded + '?v=' + (Math.random() * 101 | 0);
+            }
+
+            // ===== HELPER: отображение состояния загрузки =====
+            function showLoading() {
+                app.innerHTML =
+                    '<div class="loading"><div class="spinner"></div><span class="loading-text">Searching related images...</span></div>';
+            }
+
+            // ===== HELPER: сообщение =====
+            function showMessage(icon, text, hint) {
+                app.innerHTML =
+                    '<div class="message">' +
+                    '<div class="message-icon">' + escapeHtml(icon) + '</div>' +
+                    '<div class="message-text">' + text + '</div>' +
+                    (hint ? '<div class="message-hint">' + hint + '</div>' : '') +
+                    '</div>';
+            }
+
+            // ===== HELPER: ошибка =====
+            function showError(text) {
+                app.innerHTML =
+                    '<div class="message">' +
+                    '<div class="message-icon error-message">⚠</div>' +
+                    '<div class="message-text error-message">' + escapeHtml(text) + '</div>' +
+                    '</div>';
+            }
+
+            // ===== HELPER: открытие изображения в режиме просмотра (Detail Mode) =====
+            // В Eagle стандартный eagle.item.open(id) вызывает openItemLocation -> quickOpenFolder -> reload(),
+            // который сбрасывает текущий фильтр/папку и вызывает leaveDetailMode(), выбрасывая обратно в общий каталог.
+            // Поэтому открываем изображение напрямую через родительский webContents ($bodyScope.enterDetailMode / переключение current).
+            async function openItemInDetailView(itemId) {
+                try {
+                    const path = require('path');
+                    const remote = require(path.join(process.resourcesPath, 'app.asar', 'node_modules', '@electron', 'remote'));
+                    const parentWC = (window.parentID && remote.webContents.fromId(window.parentID)) || remote.getCurrentWindow().webContents;
+                    if (parentWC) {
+                        const opened = await parentWC.executeJavaScript(`
+                            (function(itemId) {
+                                var scope = window.$bodyScope || (window.angular && window.angular.element(document.body).scope());
+                                if (!scope || !scope.itemMappings) return false;
+                                var item = scope.itemMappings[itemId];
+                                if (!item) return false;
+
+                                if (scope.isDetailMode) {
+                                    if (typeof scope.rememberScrollTops === 'function') {
+                                        scope.rememberScrollTops(scope.current);
+                                    }
+                                    if (window.$) {
+                                        window.$("#detail-container").smoothZoom('cleanBitmapViewer');
+                                    }
+                                    scope.selected = [item];
+                                    scope.selectedFolderMappings = {};
+                                    if (typeof scope.forceFitImageSize === 'function') {
+                                        scope.forceFitImageSize(item, true);
+                                    }
+                                    scope.current = item;
+                                    scope.isGifReady = false;
+                                    if (window.$) {
+                                        window.$("#detail-container").smoothZoom('updateNavigator', scope.current);
+                                    }
+                                    if (typeof scope.lastZoom === 'function' && !scope.lastZoom() && typeof scope.zoom === 'function') {
+                                        scope.zoom(item);
+                                    }
+                                    setTimeout(function() {
+                                        if (typeof scope.lastZoom === 'function' && !scope.lastZoom() && typeof scope.zoom === 'function') {
+                                            scope.zoom(item);
+                                        }
+                                        scope.$evalAsync();
+                                    }, 100);
+                                    if (typeof scope.addToRecentFile === 'function') {
+                                        scope.addToRecentFile(scope.current);
+                                    }
+                                } else {
+                                    scope.selected = [item];
+                                    scope.selectedFolderMappings = {};
+                                    if (typeof scope.enterDetailMode === 'function') {
+                                        scope.enterDetailMode(null, item);
+                                    }
+                                }
+
+                                scope.$evalAsync();
+                                return true;
+                            })(${JSON.stringify(itemId)});
+                        `);
+                        if (opened) return;
+                    }
+                } catch (err) {
+                    console.warn('[Parent Viewer] Direct detail mode navigation fallback:', err);
+                }
+
+                // Fallback через внутренний IPC-канал Eagle 'open-item'
+                try {
+                    const { ipcRenderer } = require('electron');
+                    if (window.parentID) {
+                        ipcRenderer.sendTo(window.parentID, 'open-item', itemId);
+                        return;
+                    }
+                } catch (err) {
+                    console.warn('[Parent Viewer] IPC open-item fallback error:', err);
+                }
+
+                await eagle.item.open(itemId);
+            }
+
+            // ===== HELPER: отдельное окно просмотра всего parent сета =====
+            // Окно — это "main" страница плагина (viewer.html в manifest.json). Открываем её так же,
+            // как find-by-media: через внутренний IPC-канал Eagle 'open-plugin'.
+            // Какой сет показать — передаём через localStorage, окно само грузит арты через eagle API.
+            const WINDOW_REQUEST_KEY = 'parent-viewer-window-request';
+            const DEFAULT_PLUGIN_ID = 'ee35f9fc-f791-4b94-a669-b4a66b5b7137';
+            let pluginPath = '';
+
+            function getPluginId() {
+                try {
+                    const fs = require('fs');
+                    const path = require('path');
+                    const manifestPath = path.join(pluginPath || __dirname, 'manifest.json');
+                    if (fs.existsSync(manifestPath)) {
+                        const mf = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+                        if (mf && mf.id) return mf.id;
+                    }
+                } catch (err) {
+                    console.warn('[Parent Viewer] Failed to read manifest:', err);
+                }
+                return DEFAULT_PLUGIN_ID;
+            }
+
+            function openParentWindow(currentItem, parentTag) {
+                try {
+                    localStorage.setItem(WINDOW_REQUEST_KEY, JSON.stringify({
+                        tag: parentTag.full,
+                        startId: currentItem.id,
+                        ts: Date.now()
+                    }));
+                } catch (err) {
+                    // localStorage недоступен — окно возьмёт сет по текущему выделению
+                }
+
+                const { ipcRenderer } = require('electron');
+                const pluginId = getPluginId();
+                if (window.parentID) {
+                    ipcRenderer.sendTo(window.parentID, 'open-plugin', pluginId);
+                } else {
+                    ipcRenderer.send('open-plugin', pluginId);
+                }
+            }
+
+            // ===== HELPER: отображение grid с результатами =====
+            function renderResults(currentItem, parentTag, items) {
+                // Исключаем текущий элемент
+                const filtered = items.filter(item => item.id !== currentItem.id);
+
+                if (filtered.length === 0) {
+                    showMessage(
+                        '🔗',
+                        'No other images with tag <strong>' + escapeHtml(parentTag.full) + '</strong>',
+                        'Current image is the only one with this tag'
+                    );
+                    return;
+                }
+
+                let html = '';
+
+                // Шапка
+                html += '<div class="header">';
+                html += '<div class="header-title">';
+                html += '<span class="icon">🔗</span> Related by tag';
+                html += ' <span class="parent-badge" title="Click to copy tag">' + escapeHtml(parentTag.full) + '</span>';
+                html += ' <button class="btn-watch-parent" title="Open all ' + items.length + ' artworks of ' + escapeHtml(parentTag.full) + ' in a separate window">👁 Watch parent</button>';
+                html += '</div>';
+                html += '<div class="header-right">';
+                html += '<button class="btn-delete-set" title="Move entire ' + escapeHtml(parentTag.full) + ' set (' + items.length + ' items) to Eagle Trash">🗑 Delete Set (' + items.length + ')</button>';
+                html += '<span class="header-count" title="Other artworks with this tag">' + filtered.length + '</span>';
+                html += '</div>';
+                html += '</div>';
+
+                // Сетка
+                html += '<div class="grid">';
+
+                for (const item of filtered) {
+                    const displayName = item.name || 'untitled';
+                    const ext = item.ext || '';
+
+                    html += '<div class="card" data-id="' + escapeHtml(item.id) + '">';
+
+                    // Миниатюра — используем thumbnailPath с конвертацией в file:/// URL
+                    const thumbUrl = item.thumbnailPath ? filePathToURL(item.thumbnailPath) : (item.filePath ? filePathToURL(item.filePath) : null);
+                    if (thumbUrl) {
+                        html += '<img class="card-thumb" src="' + escapeHtml(thumbUrl) + '" alt="' +
+                            escapeHtml(displayName) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" />';
+                        html += '<div class="card-thumb-placeholder" style="display:none;">🖼</div>';
+                    } else {
+                        html += '<div class="card-thumb-placeholder">🖼</div>';
+                    }
+
+                    // Имя + расширение
+                    html += '<div class="card-info">';
+                    html += escapeHtml(displayName);
+                    if (ext) {
+                        html += '<span class="ext">.' + escapeHtml(ext) + '</span>';
+                    }
+                    html += '</div>';
+
+                    html += '</div>';
+                }
+
+                html += '</div>';
+
+                app.innerHTML = html;
+
+                // ===== Обработчик клика по parent-бейджу: копирование в буфер обмена =====
+                const parentBadge = app.querySelector('.parent-badge');
+                if (parentBadge) {
+                    parentBadge.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const originalText = this.textContent;
+                        eagle.clipboard.writeText(parentTag.full);
+                        this.textContent = '✓ Copied!';
+                        setTimeout(() => {
+                            this.textContent = originalText;
+                        }, 1500);
+                    });
+                }
+
+                // ===== Обработчик открытия всего parent сета в отдельном окне =====
+                const watchParentBtn = app.querySelector('.btn-watch-parent');
+                if (watchParentBtn) {
+                    watchParentBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        try {
+                            openParentWindow(currentItem, parentTag);
+                        } catch (err) {
+                            console.error('[Parent Viewer] Failed to open parent window:', err);
+                        }
+                    });
+                }
+
+                // ===== Обработчик удаления всего parent сета в корзину Eagle =====
+                const deleteSetBtn = app.querySelector('.btn-delete-set');
+                if (deleteSetBtn) {
+                    deleteSetBtn.addEventListener('click', async function(e) {
+                        e.stopPropagation();
+                        this.disabled = true;
+                        this.textContent = 'Deleting...';
+                        try {
+                            for (const it of items) {
+                                const eagleItem = await eagle.item.getById(it.id);
+                                if (eagleItem) {
+                                    await eagleItem.moveToTrash();
+                                }
+                            }
+                            lastSelectedId = null;
+                            lastParentTagFull = null;
+                            showMessage('🗑', 'Deleted set <strong>' + escapeHtml(parentTag.full) + '</strong> (' + items.length + ' items)', 'Moved to Eagle Trash');
+                        } catch (err) {
+                            console.error('[Parent Viewer] Failed to delete set:', err);
+                            this.disabled = false;
+                            this.textContent = '🗑 Error';
+                        }
+                    });
+                }
+
+                // ===== Обработчики кликов по карточкам =====
+                // ЛКМ — перейти к изображению (открыть в текущем окне)
+                // СКМ — открыть изображение в новом окне / вкладке
+                const cards = app.querySelectorAll('.card');
+                for (const card of cards) {
+                    // Предотвращаем автоскролл браузера при нажатии СКМ
+                    card.addEventListener('mousedown', function(e) {
+                        if (e.button === 1) {
+                            e.preventDefault();
+                        }
+                    });
+
+                    // ЛКМ — открываем изображение в режиме просмотра (Detail Mode) в текущем окне
+                    card.addEventListener('click', async function(e) {
+                        if (e.button !== 0) return;
+                        e.preventDefault();
+                        const id = this.getAttribute('data-id');
+                        if (id) {
+                            try {
+                                await openItemInDetailView(id);
+                            } catch (err) {
+                                console.error('[Parent Viewer] Failed to open item:', err);
+                            }
+                        }
+                    });
+
+                    // Средняя кнопка мыши (СКМ) — открываем в новом окне/вкладке
+                    card.addEventListener('auxclick', async function(e) {
+                        if (e.button !== 1) return;
+                        e.preventDefault();
+                        const id = this.getAttribute('data-id');
+                        if (id) {
+                            try {
+                                await eagle.item.open(id, { window: true });
+                            } catch (err) {
+                                console.error('[Parent Viewer] Failed to open item in new window:', err);
+                            }
+                        }
+                    });
+                }
+            }
+
+            // ===== ОТСЛЕЖИВАНИЕ ВЫБРАННОГО ЭЛЕМЕНТА =====
+            let lastSelectedId = null;
+            let lastParentTagFull = null;
+            let isUpdating = false;
+            const POLL_INTERVAL = 400;
+
+            // ===== ОСНОВНАЯ ФУНКЦИЯ =====
+            async function updateParentView(force = false) {
+                if (isUpdating) return;
+                isUpdating = true;
+                try {
+                    // Получаем выбранный элемент
+                    const items = await eagle.item.getSelected();
+
+                    if (!items || items.length === 0) {
+                        if (force || lastSelectedId !== null) {
+                            lastSelectedId = null;
+                            lastParentTagFull = null;
+                            showMessage('👆', 'Select an image', 'Click an image in the library');
+                        }
+                        return;
+                    }
+
+                    const currentItem = items[0];
+                    const parentTag = extractParentTag(currentItem.tags);
+                    const currentParentFull = parentTag ? parentTag.full : null;
+
+                    // Если элемент и его parent-тег не изменились, не перерисовываем без необходимости
+                    if (!force && currentItem.id === lastSelectedId && currentParentFull === lastParentTagFull) {
+                        return;
+                    }
+
+                    lastSelectedId = currentItem.id;
+                    lastParentTagFull = currentParentFull;
+
+                    // Показываем загрузку
+                    showLoading();
+
+                    // Проверяем, что это изображение (не bookmark)
+                    if (currentItem.ext && ['url', 'bookmark', 'folder'].includes(currentItem.ext)) {
+                        showMessage('🖼', 'Not an image', 'This plugin only works with images');
+                        return;
+                    }
+
+                    if (!parentTag) {
+                        showMessage(
+                            '🏷️',
+                            'This image has no <strong>parent:XXXX</strong> tag',
+                            'Add a tag like "parent:abc123" to the image'
+                        );
+                        return;
+                    }
+
+                    // Ищем все изображения с таким же parent:тегом
+                    // Используем fields для оптимизации — запрашиваем только нужные поля
+                    const searchResult = await eagle.item.get({
+                        tags: [parentTag.full],
+                        fields: ['id', 'name', 'tags', 'thumbnailPath', 'filePath', 'ext']
+                    });
+
+                    if (!searchResult || searchResult.length === 0) {
+                        showMessage(
+                            '🔗',
+                            'No images found with tag <strong>' + escapeHtml(parentTag.full) + '</strong>',
+                            'The tag may have been removed or the library is out of sync'
+                        );
+                        return;
+                    }
+
+                    // Отображаем результаты
+                    renderResults(currentItem, parentTag, searchResult);
+
+                } catch (err) {
+                    console.error('[Parent Viewer] Error:', err);
+                    showError('Error: ' + (err.message || 'unknown error'));
+                } finally {
+                    isUpdating = false;
+                }
+            }
+
+            // Опрос текущего выбранного элемента (как в find-by-media),
+            // т.к. в Eagle API нет события onItemSelected и при навигации через eagle.item.open()
+            // плагин-инспектор должен сам отслеживать смену активной картинки.
+            async function pollSelection() {
+                await updateParentView(false);
+                setTimeout(pollSelection, POLL_INTERVAL);
+            }
+
+            // ===== ЖИЗНЕННЫЙ ЦИКЛ ПЛАГИНА =====
+
+            // При создании плагина — получаем тему и запускаем отслеживание
+            eagle.onPluginCreate(async function(plugin) {
+                pluginPath = (plugin && plugin.path) || '';
+                try {
+                    const theme = await eagle.app.theme;
+                    document.body.setAttribute('theme', theme);
+                } catch (err) {
+                    console.error('[Parent Viewer] Theme error:', err);
+                }
+                await updateParentView(true);
+                setTimeout(pollSelection, POLL_INTERVAL);
+            });
+
+            // При запуске/показе плагина — обновляем содержимое
+            eagle.onPluginRun(function() {
+                updateParentView(true);
+            });
+
+            if (typeof eagle.onPluginShow === 'function') {
+                eagle.onPluginShow(function() {
+                    updateParentView(false);
+                });
+            }
+
+            // При смене темы — обновляем CSS-переменные
+            if (typeof eagle.onThemeChanged === 'function') {
+                eagle.onThemeChanged(function(theme) {
+                    document.body.setAttribute('theme', theme);
+                });
+            }
+
+        })();
+    </script>
+</body>
+
+</html>

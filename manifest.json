@@ -1,0 +1,33 @@
+{
+    "id": "ee35f9fc-f791-4b94-a669-b4a66b5b7137",
+    "version": "1.0.0",
+    "platform": "all",
+    "arch": "all",
+    "name": "Parent Viewer",
+    "description": "Finds images sharing the same parent: tag as the currently selected image",
+    "logo": "/logo.png",
+    "keywords": [],
+    "devTools": false,
+    "main": {
+        "url": "viewer.html",
+        "width": 1280,
+        "height": 900,
+        "minWidth": 480,
+        "minHeight": 360,
+        "frame": true,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "fullscreenable": true,
+        "backgroundColor": "#111111"
+    },
+    "preview": {
+        "jpg,jpeg,png,gif,svg,webp,bmp,tiff,tif,ico,avif,jfif": {
+            "inspector": {
+                "path": "index.html",
+                "height": 300,
+                "multiSelect": false
+            }
+        }
+    }
+}

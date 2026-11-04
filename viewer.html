@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Parent Viewer</title>
+    <style>
+        /* ===== RESET & BASE ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+            font-size: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #111111;
+            color: #d4d4d4;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== TOOLBAR ===== */
+        .toolbar {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            height: 36px;
+            padding: 0 12px;
+            background: #1b1b1b;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .tag-badge {
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 11px;
+            background: #2d2d2d;
+            color: #aaaaaa;
+            padding: 2px 7px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+
+        .counter {
+            font-size: 11px;
+            color: #888888;
+            white-space: nowrap;
+        }
+
+        .item-name {
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #bbbbbb;
+        }
+
+        .item-name .ext {
+            opacity: 0.5;
+            margin-left: 2px;
+        }
+
+        .tb-btn {
+            font-size: 11px;
+            background: #2a2a2a;
+            color: #cccccc;
+            border: 1px solid #3a3a3a;
+            border-radius: 4px;
+            padding: 3px 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+
+        .tb-btn:hover {
+            background: #3a3a3a;
+            color: #ffffff;
+        }
+
+        .tb-btn.active {
+            background: #1a73e8;
+            border-color: #1a73e8;
+            color: #ffffff;
+        }
+
+        /* ===== STAGE ===== */
+        .stage {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+            overflow: hidden;
+            cursor: default;
+        }
+
+        .stage.zoomed {
+            cursor: grab;
+        }
+
+        .stage.panning {
+            cursor: grabbing;
+        }
+
+        #main-img {
+            position: absolute;
+            left: 0;
+            top: 0;
+            transform-origin: 0 0;
+            max-width: none;
+            max-height: none;
+            image-rendering: auto;
+            -webkit-user-drag: none;
+        }
+
+        .stage-message {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777777;
+            font-size: 13px;
+            pointer-events: none;
+        }
+
+        .nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 44px;
+            height: 80px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.35);
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 28px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s, background 0.15s;
+            z-index: 5;
+        }
+
+        .stage:hover .nav-btn {
+            opacity: 1;
+        }
+
+        .nav-btn:hover {
+            background: rgba(0, 0, 0, 0.6);
+            color: #ffffff;
+        }
+
+        .nav-btn.prev {
+            left: 10px;
+        }
+
+        .nav-btn.next {
+            right: 10px;
+        }
+
+        .zoom-label {
+            position: absolute;
+            right: 12px;
+            bottom: 10px;
+            font-size: 11px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #cccccc;
+            padding: 2px 7px;
+            border-radius: 3px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* ===== FILMSTRIP ===== */
+        .filmstrip {
+            flex-shrink: 0;
+            display: flex;
+            gap: 6px;
+            height: 96px;
+            padding: 8px 10px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            background: #1b1b1b;
+            border-top: 1px solid #2a2a2a;
+        }
+
+        body.hide-strip .filmstrip {
+            display: none;
+        }
+
+        .filmstrip::-webkit-scrollbar {
+            height: 5px;
+        }
+
+        .filmstrip::-webkit-scrollbar-thumb {
+            background: #555555;
+            border-radius: 3px;
+        }
+
+        .thumb {
+            flex-shrink: 0;
+            height: 100%;
+            aspect-ratio: 1;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            background: #2d2d2d;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.15s, border-color 0.15s;
+        }
+
+        .thumb:hover {
+            opacity: 0.9;
+        }
+
+        .thumb.active {
+            border-color: #1a73e8;
+            opacity: 1;
+        }
+
+        .thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            -webkit-user-drag: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="toolbar">
+        <span class="tag-badge" id="tag-badge"></span>
+        <span class="counter" id="counter"></span>
+        <span class="item-name" id="item-name"></span>
+        <button class="tb-btn" id="btn-sync" title="Load the set of the image currently selected in Eagle">⟳ Selected</button>
+        <button class="tb-btn" id="btn-slideshow" title="Slideshow (Space)">▶ Slideshow</button>
+        <button class="tb-btn" id="btn-fit" title="Toggle fit / 100% (double-click, 0)">Fit</button>
+        <button class="tb-btn" id="btn-strip" title="Toggle thumbnails (T)">▤ Thumbs</button>
+        <button class="tb-btn" id="btn-fullscreen" title="Fullscreen (F)">⛶</button>
+    </div>
+
+    <div class="stage" id="stage">
+        <img id="main-img" alt="" draggable="false" />
+        <div class="stage-message" id="stage-message">Loading...</div>
+        <button class="nav-btn prev" id="btn-prev" title="Previous (←)">‹</button>
+        <button class="nav-btn next" id="btn-next" title="Next (→)">›</button>
+        <div class="zoom-label" id="zoom-label"></div>
+    </div>
+
+    <div class="filmstrip" id="filmstrip"></div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ===== DOM REFERENCES =====
+            const stage = document.getElementById('stage');
+            const mainImg = document.getElementById('main-img');
+            const stageMessage = document.getElementById('stage-message');
+            const filmstrip = document.getElementById('filmstrip');
+            const tagBadge = document.getElementById('tag-badge');
+            const counter = document.getElementById('counter');
+            const itemName = document.getElementById('item-name');
+            const zoomLabel = document.getElementById('zoom-label');
+            const btnSlideshow = document.getElementById('btn-slideshow');
+            const btnFit = document.getElementById('btn-fit');
+            const btnStrip = document.getElementById('btn-strip');
+
+            const STRIP_KEY = 'parent-viewer-window-strip';
+            const SLIDESHOW_DELAY = 3000;
+            const MIN_SCALE = 0.05;
+            const MAX_SCALE = 20;
+
+            // ===== STATE =====
+            let items = [];
+            let index = 0;
+            let scale = 1;
+            let offsetX = 0;
+            let offsetY = 0;
+            let fitMode = true;
+            let slideshowTimer = null;
+            let usingThumbFallback = false;
+
+            // ===== HELPER: экранирование HTML =====
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+
+            // ===== HELPER: конвертация пути в file:/// URL =====
+            function filePathToURL(filePath) {
+                if (!filePath) return '';
+                const normalized = filePath.replace(/\\/g, '/');
+                return 'file:///' + encodeURI(normalized).replace(/#/g, '%23').replace(/\?/g, '%3F');
+            }
+
+            // ===== ЗАГРУЗКА СЕТА =====
+            // Инспектор кладёт запрос {tag, startId, ts} в localStorage и открывает это окно через IPC 'open-plugin'.
+            // Если запроса нет (или он устарел) — берём parent:тег у текущего выбранного элемента Eagle.
+            const REQUEST_KEY = 'parent-viewer-window-request';
+            const REQUEST_TTL = 15000;
+            const PARENT_TAG_REGEX = /^parent:([a-zA-Z0-9]+)$/;
+            let lastRequestTs = 0;
+            let isLoading = false;
+            let pendingMode = null;
+
+            function readRequest() {
+                try {
+                    const req = JSON.parse(localStorage.getItem(REQUEST_KEY) || 'null');
+                    if (req && req.tag && req.ts > lastRequestTs && Date.now() - req.ts < REQUEST_TTL) {
+                        return req;
+                    }
+                } catch (err) {
+                    // localStorage недоступен — игнорируем
+                }
+                return null;
+            }
+
+            async function requestFromSelection() {
+                const selected = await eagle.item.getSelected();
+                const current = selected && selected[0];
+                if (!current || !Array.isArray(current.tags)) return null;
+                const tag = current.tags.find(t => PARENT_TAG_REGEX.test(t));
+                return tag ? { tag: tag, startId: current.id } : null;
+            }
+
+            function showStageMessage(text) {
+                mainImg.style.display = 'none';
+                stageMessage.textContent = text;
+                stageMessage.style.display = 'flex';
+            }
+
+            // mode: 'request' — только свежий запрос из инспектора,
+            //       'auto' — запрос из инспектора, иначе текущее выделение (если недавно не было запроса),
+            //       'selection' — всегда текущее выделение
+            async function loadSet(mode) {
+                if (isLoading) {
+                    // Повторим после текущей загрузки
+                    pendingMode = mode;
+                    return;
+                }
+                isLoading = true;
+                try {
+                    let req = mode === 'selection' ? null : readRequest();
+                    if (req) {
+                        lastRequestTs = req.ts;
+                    } else if (mode === 'selection' || items.length === 0 ||
+                        (mode === 'auto' && Date.now() - lastRequestTs > REQUEST_TTL)) {
+                        req = await requestFromSelection();
+                    }
+                    if (!req) {
+                        if (items.length === 0) {
+                            tagBadge.textContent = '';
+                            showStageMessage('Select an image with a parent:XXXX tag and press "Watch parent"');
+                        }
+                        return;
+                    }
+
+                    stopSlideshow();
+                    showStageMessage('Loading...');
+                    const result = await eagle.item.get({
+                        tags: [req.tag],
+                        fields: ['id', 'name', 'ext', 'filePath', 'thumbnailPath']
+                    });
+
+                    items = (result || []).map(it => ({
+                        id: it.id,
+                        name: it.name || '',
+                        ext: it.ext || '',
+                        src: it.filePath || '',
+                        thumb: it.thumbnailPath || ''
+                    }));
+                    tagBadge.textContent = req.tag;
+                    document.title = req.tag + ' — ' + items.length + ' images';
+
+                    renderFilmstrip();
+                    if (items.length === 0) {
+                        counter.textContent = '';
+                        itemName.textContent = '';
+                        showStageMessage('No images with tag ' + req.tag);
+                        return;
+                    }
+                    show(Math.max(0, items.findIndex(it => it.id === req.startId)));
+                } catch (err) {
+                    console.error('[Parent Viewer] Failed to load set:', err);
+                    showStageMessage('Error: ' + (err.message || 'unknown error'));
+                } finally {
+                    isLoading = false;
+                    if (pendingMode) {
+                        const next = pendingMode;
+                        pendingMode = null;
+                        loadSet(next);
+                    }
+                }
+            }
+
+            // ===== FILMSTRIP =====
+            function renderFilmstrip() {
+                let html = '';
+                items.forEach((it, i) => {
+                    const src = filePathToURL(it.thumb || it.src);
+                    html += '<div class="thumb" data-index="' + i + '" title="' + escapeHtml(it.name || '') + '">';
+                    html += '<img src="' + escapeHtml(src) + '" loading="lazy" alt="" draggable="false" />';
+                    html += '</div>';
+                });
+                filmstrip.innerHTML = html;
+            }
+
+            filmstrip.addEventListener('click', function(e) {
+                const thumb = e.target.closest('.thumb');
+                if (!thumb) return;
+                stopSlideshow();
+                show(parseInt(thumb.getAttribute('data-index'), 10));
+            });
+
+            // Колесо над лентой — горизонтальная прокрутка
+            filmstrip.addEventListener('wheel', function(e) {
+                if (e.deltaY !== 0) {
+                    filmstrip.scrollLeft += e.deltaY;
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            function updateFilmstripActive() {
+                const prev = filmstrip.querySelector('.thumb.active');
+                if (prev) prev.classList.remove('active');
+                const cur = filmstrip.querySelector('.thumb[data-index="' + index + '"]');
+                if (cur) {
+                    cur.classList.add('active');
+                    cur.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+                }
+            }
+
+            // ===== ПОКАЗ ИЗОБРАЖЕНИЯ =====
+            function show(i) {
+                if (items.length === 0) return;
+                index = (i + items.length) % items.length;
+                const it = items[index];
+
+                counter.textContent = (index + 1) + ' / ' + items.length;
+                itemName.innerHTML = escapeHtml(it.name || 'untitled') +
+                    (it.ext ? '<span class="ext">.' + escapeHtml(it.ext) + '</span>' : '');
+                itemName.title = it.name || '';
+
+                stageMessage.textContent = 'Loading...';
+                stageMessage.style.display = 'flex';
+                mainImg.style.display = 'none';
+                usingThumbFallback = false;
+                mainImg.src = filePathToURL(it.src || it.thumb);
+
+                updateFilmstripActive();
+                preload(index + 1);
+                preload(index - 1);
+            }
+
+            function preload(i) {
+                if (items.length < 2) return;
+                const it = items[(i + items.length) % items.length];
+                const img = new Image();
+                img.src = filePathToURL(it.src || it.thumb);
+            }
+
+            mainImg.addEventListener('load', function() {
+                stageMessage.style.display = 'none';
+                mainImg.style.display = 'block';
+                fitMode = true;
+                fitToStage();
+            });
+
+            mainImg.addEventListener('error', function() {
+                const it = items[index];
+                // Если оригинал не загрузился — пробуем миниатюру
+                if (it && it.thumb && it.src && !usingThumbFallback) {
+                    usingThumbFallback = true;
+                    mainImg.src = filePathToURL(it.thumb);
+                    return;
+                }
+                mainImg.style.display = 'none';
+                stageMessage.textContent = 'Failed to load image';
+                stageMessage.style.display = 'flex';
+            });
+
+            function next() {
+                show(index + 1);
+            }
+
+            function prev() {
+                show(index - 1);
+            }
+
+            document.getElementById('btn-prev').addEventListener('click', function(e) {
+                e.stopPropagation();
+                stopSlideshow();
+                prev();
+            });
+
+            document.getElementById('btn-next').addEventListener('click', function(e) {
+                e.stopPropagation();
+                stopSlideshow();
+                next();
+            });
+
+            // ===== ZOOM / PAN =====
+            function applyTransform() {
+                mainImg.style.transform = 'translate(' + offsetX + 'px, ' + offsetY + 'px) scale(' + scale + ')';
+                zoomLabel.textContent = Math.round(scale * 100) + '%';
+                btnFit.textContent = fitMode ? 'Fit' : '100%';
+                stage.classList.toggle('zoomed', !fitMode);
+            }
+
+            function centerAt(newScale) {
+                const w = mainImg.naturalWidth;
+                const h = mainImg.naturalHeight;
+                scale = newScale;
+                offsetX = (stage.clientWidth - w * scale) / 2;
+                offsetY = (stage.clientHeight - h * scale) / 2;
+                applyTransform();
+            }
+
+            function fitToStage() {
+                const w = mainImg.naturalWidth;
+                const h = mainImg.naturalHeight;
+                if (!w || !h) return;
+                // Маленькие картинки не растягиваем больше 100%
+                const s = Math.min(stage.clientWidth / w, stage.clientHeight / h, 1);
+                fitMode = true;
+                centerAt(s);
+            }
+
+            function toggleFit() {
+                if (!mainImg.naturalWidth) return;
+                if (fitMode) {
+                    fitMode = false;
+                    centerAt(1);
+                } else {
+                    fitToStage();
+                }
+            }
+
+            function zoomAt(factor, clientX, clientY) {
+                if (!mainImg.naturalWidth) return;
+                const rect = stage.getBoundingClientRect();
+                const px = clientX - rect.left;
+                const py = clientY - rect.top;
+                const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor));
+                // Зум относительно точки под курсором
+                offsetX = px - (px - offsetX) * (newScale / scale);
+                offsetY = py - (py - offsetY) * (newScale / scale);
+                scale = newScale;
+                fitMode = false;
+                applyTransform();
+            }
+
+            btnFit.addEventListener('click', toggleFit);
+            stage.addEventListener('dblclick', function(e) {
+                if (e.target.closest('.nav-btn')) return;
+                toggleFit();
+            });
+
+            window.addEventListener('resize', function() {
+                if (fitMode) fitToStage();
+            });
+
+            // Колесо: листание; Ctrl + колесо: зум
+            let wheelLock = 0;
+            stage.addEventListener('wheel', function(e) {
+                e.preventDefault();
+                if (e.ctrlKey) {
+                    zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY);
+                    return;
+                }
+                const now = Date.now();
+                if (now - wheelLock < 150) return;
+                wheelLock = now;
+                stopSlideshow();
+                if (e.deltaY > 0 || e.deltaX > 0) next();
+                else if (e.deltaY < 0 || e.deltaX < 0) prev();
+            }, { passive: false });
+
+            // Перетаскивание увеличенного изображения
+            let panning = false;
+            let panStartX = 0;
+            let panStartY = 0;
+            let panOrigX = 0;
+            let panOrigY = 0;
+
+            stage.addEventListener('pointerdown', function(e) {
+                if (e.button !== 0 || fitMode || e.target.closest('.nav-btn')) return;
+                panning = true;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+                panOrigX = offsetX;
+                panOrigY = offsetY;
+                stage.classList.add('panning');
+                stage.setPointerCapture(e.pointerId);
+            });
+
+            stage.addEventListener('pointermove', function(e) {
+                if (!panning) return;
+                offsetX = panOrigX + (e.clientX - panStartX);
+                offsetY = panOrigY + (e.clientY - panStartY);
+                applyTransform();
+            });
+
+            stage.addEventListener('pointerup', function() {
+                panning = false;
+                stage.classList.remove('panning');
+            });
+
+            // ===== SLIDESHOW =====
+            function startSlideshow() {
+                if (items.length < 2) return;
+                stopSlideshow();
+                slideshowTimer = setInterval(next, SLIDESHOW_DELAY);
+                btnSlideshow.classList.add('active');
+                btnSlideshow.textContent = '❚❚ Slideshow';
+            }
+
+            function stopSlideshow() {
+                if (slideshowTimer) {
+                    clearInterval(slideshowTimer);
+                    slideshowTimer = null;
+                }
+                btnSlideshow.classList.remove('active');
+                btnSlideshow.textContent = '▶ Slideshow';
+            }
+
+            function toggleSlideshow() {
+                if (slideshowTimer) stopSlideshow();
+                else startSlideshow();
+            }
+
+            btnSlideshow.addEventListener('click', toggleSlideshow);
+
+            // ===== FILMSTRIP TOGGLE =====
+            function setStripVisible(visible) {
+                document.body.classList.toggle('hide-strip', !visible);
+                btnStrip.classList.toggle('active', visible);
+                try {
+                    localStorage.setItem(STRIP_KEY, visible ? '1' : '0');
+                } catch (e) {
+                    // localStorage недоступен — игнорируем
+                }
+                if (fitMode) fitToStage();
+            }
+
+            btnStrip.addEventListener('click', function() {
+                setStripVisible(document.body.classList.contains('hide-strip'));
+            });
+
+            (function initStrip() {
+                let visible = true;
+                try {
+                    visible = localStorage.getItem(STRIP_KEY) !== '0';
+                } catch (e) {
+                    // localStorage недоступен — игнорируем
+                }
+                setStripVisible(visible);
+            })();
+
+            // ===== FULLSCREEN =====
+            let isFullScreen = false;
+
+            function setFullScreen(value) {
+                isFullScreen = value;
+                eagle.window.setFullScreen(value);
+                // Ждём, пока окно применит новый размер
+                setTimeout(function() {
+                    if (fitMode) fitToStage();
+                }, 150);
+            }
+
+            function toggleFullscreen() {
+                setFullScreen(!isFullScreen);
+            }
+
+            document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
+
+            // ===== KEYBOARD =====
+            document.addEventListener('keydown', function(e) {
+                switch (e.key) {
+                    case 'ArrowRight':
+                    case 'ArrowDown':
+                    case 'PageDown':
+                    case 'd':
+                    case 'D':
+                        stopSlideshow();
+                        next();
+                        break;
+                    case 'ArrowLeft':
+                    case 'ArrowUp':
+                    case 'PageUp':
+                    case 'a':
+                    case 'A':
+                        stopSlideshow();
+                        prev();
+                        break;
+                    case 'Home':
+                        stopSlideshow();
+                        show(0);
+                        break;
+                    case 'End':
+                        stopSlideshow();
+                        show(items.length - 1);
+                        break;
+                    case ' ':
+                        toggleSlideshow();
+                        break;
+                    case 'f':
+                    case 'F':
+                    case 'F11':
+                        toggleFullscreen();
+                        break;
+                    case 't':
+                    case 'T':
+                        setStripVisible(document.body.classList.contains('hide-strip'));
+                        break;
+                    case '0':
+                        toggleFit();
+                        break;
+                    case '+':
+                    case '=':
+                        zoomAt(1.25, stage.getBoundingClientRect().left + stage.clientWidth / 2, stage.getBoundingClientRect().top + stage.clientHeight / 2);
+                        break;
+                    case '-':
+                        zoomAt(1 / 1.25, stage.getBoundingClientRect().left + stage.clientWidth / 2, stage.getBoundingClientRect().top + stage.clientHeight / 2);
+                        break;
+                    case 'Escape':
+                        if (isFullScreen) setFullScreen(false);
+                        else eagle.window.hide();
+                        break;
+                    default:
+                        return;
+                }
+                e.preventDefault();
+            });
+
+            document.getElementById('btn-sync').addEventListener('click', function() {
+                loadSet('selection');
+            });
+
+            // ===== ЖИЗНЕННЫЙ ЦИКЛ ПЛАГИНА =====
+            eagle.onPluginCreate(function() {
+                loadSet('auto');
+            });
+
+            // Окно уже открыто и в инспекторе снова нажали "Watch parent"
+            eagle.onPluginRun(function() {
+                loadSet('auto');
+            });
+
+            eagle.onPluginShow(function() {
+                loadSet('request');
+            });
+
+            window.addEventListener('storage', function(e) {
+                if (e.key === REQUEST_KEY) loadSet('request');
+            });
+
+            // При закрытии окна останавливаем слайд-шоу
+            eagle.onPluginHide(function() {
+                stopSlideshow();
+                if (isFullScreen) setFullScreen(false);
+            });
+        })();
+    </script>
+</body>
+
+</html>
