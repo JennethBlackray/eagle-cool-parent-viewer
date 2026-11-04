@@ -15,6 +15,10 @@ An inspector plugin for [Eagle](https://eagle.cool). It shows every artwork that
 
 ### Inspector panel
 
+<p align="center">
+  <img src="ss/eagle_sidebar.jpg" alt="Parent Viewer in the Eagle inspector" width="100%" />
+</p>
+
 | Action | Result |
 |---|---|
 | Click a card | Open that artwork in Eagle |
@@ -26,6 +30,10 @@ An inspector plugin for [Eagle](https://eagle.cool). It shows every artwork that
 ## Viewer window controls
 
 Open the viewer with the **👁 Watch parent** button.
+
+<p align="center">
+  <img src="ss/viewer_window.png" alt="Parent Viewer window" width="100%" />
+</p>
 
 ### Keyboard
 
@@ -62,4 +70,3 @@ Open the viewer with the **👁 Watch parent** button.
 - **⛶** — fullscreen.
 
 The slideshow stops as soon as you flip through artworks yourself.
-
